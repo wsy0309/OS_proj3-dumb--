@@ -68,20 +68,30 @@ void fileOpen(char* filename,unsigned int mode){
 void fileRead(unsigned int buf_size){
 	if(pcb->desc->mode == 32151679){
 		unsigned short block = pcb->desc->cur_node->blocks[0];
+		char* buf = (char*) malloc(buf_size);
+		buf = part->data_blocks[block].d;
+		printf("buf : %s\n",buf);
+		printf("buf size : %d\n",sizeof(buf));
 		printf("date : %s\n", part->data_blocks[block].d);
 		printf("date size : %d\n", sizeof(part->data_blocks[block].d));
 	}
 }
 
+void fileClose(){
+	memset(pcb->desc,0,sizeof(Descriptor));	
+	printf("pcd desc : %s, mode: %d\n", pcb->desc->file_name, pcb->desc->mode);
+
+}
+
 int main(){
 	pcb = (Pcb*) malloc(sizeof(Pcb));
 	fileMount();
-	fileOpen("file_1",32151679);
+	fileOpen("file_30",32151679);
 
 	printf("pcb desc : %s, mode : %d, inode->block : %d \n", pcb->desc->file_name, pcb->desc->mode, pcb->desc->cur_node->blocks[0]);
 	
-	fileRead(1024);
-
+	fileRead(4);
+	fileClose();
 	return;
 }
 
