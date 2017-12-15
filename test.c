@@ -43,12 +43,12 @@ void fileOpen(char* filename,unsigned int mode){
 	printf("root Dir size : %x\n",root->size);
 
 	dentry* entry = (dentry*) malloc(sizeof(dentry));
-	entry = &root->blocks[0];
+	entry = &part->data_blocks[root->blocks[0]];
+
 	printf("entry[0] : %s\n",entry);
 
 	printf("dentry length : %d\n",entry->dir_length);
-
-	int tmp;	
+	
 	while(1){
 		if (strcmp(filename, entry->name) == 0){
 			pcb->desc = (Descriptor*) malloc(sizeof(Descriptor));
@@ -60,9 +60,7 @@ void fileOpen(char* filename,unsigned int mode){
 			break;
 		}
 		else{
-			tmp = entry;
-			tmp = tmp + entry->dir_length;
-			entry = tmp;
+			entry = (char*)entry + entry->dir_length;
 			printf("entry : %s\n",entry);
 			printf("entry file name : %s\n",entry->name);
 		}
