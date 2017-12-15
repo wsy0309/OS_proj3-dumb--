@@ -21,7 +21,10 @@ void fileMount(){
         printf("inode!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
         for(i=0;i<224;i++){
                 read(fd,&(part->inode_table[i]),sizeof(inode));
-                printf("%x\n",part->inode_table[i].blocks[j]);
+                for(int j = 0;j<6;j++){
+			printf("%x\t",part->inode_table[i].blocks[j]);
+		}
+		printf("\n");
         }   
             
         printf("datablock!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
