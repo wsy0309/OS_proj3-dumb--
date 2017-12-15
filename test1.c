@@ -11,29 +11,29 @@ void fileMount(){
 	
 	int fd = open("disk.img",O_RDONLY);
             
-    //printf("superblock\n");
+    printf("superblock\n");
     part = (partition*) malloc(sizeof(partition));;
     read(fd,&part->s,sizeof(super_block));
     //printf("%x\n",part->s.first_data_block);      
 
     int i;
-    //printf("inode!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    printf("inode!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     for(i=0;i<224;i++){
         read(fd,&(part->inode_table[i]),sizeof(inode));
-        //for(int j = 0;j<6;j++){
-	//		printf("%x\t",part->inode_table[i].blocks[j]);
-	//	}
-	//	printf("\n");
+        for(int j = 0;j<6;j++){
+			printf("%x\t",part->inode_table[i].blocks[j]);
+		}
+		printf("\n");
     }   
             
-    //printf("datablock!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    printf("datablock!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     for(i=0;i<4088;i++){
             read(fd,&part->data_blocks[i],sizeof(blocks));   
-            //printf("%s\n",part->data_blocks[i].d);
+            printf("%s\n",part->data_blocks[i].d);
     }   
     close(fd);
 }
-void fileOpen(char* filename,unsigned int mode){
+int fileOpen(char* filename,unsigned int mode){
 
 	inode* root = (inode*) malloc(sizeof(inode));
 	root = &part->inode_table[part->s.first_inode];
@@ -60,8 +60,8 @@ void fileOpen(char* filename,unsigned int mode){
 			break;
 		}
 		else{
-			entry = (char*)entry + entry->dir_length;
 			dir_size = dir_size - entry->dir_length;
+			entry = (char*)entry + entry->dir_length;
 			//printf("entry : %s\n",entry);
 			printf("entry file name : %s\n",entry->name);
 			printf("dir_size : %d\n",dir_size);
@@ -71,10 +71,10 @@ void fileOpen(char* filename,unsigned int mode){
 	
 	if(flag == 0){
 		printf("No File!!\n");
-		return;
+		return flag;
 	}
 	printf("file open success!!\n");
-	return;
+	return flag;
 }
 
 void fileRead(unsigned int buf_size){
@@ -89,8 +89,9 @@ void fileRead(unsigned int buf_size){
 int main(){
 	pcb = (Pcb*) malloc(sizeof(Pcb));
 	fileMount();
-	fileOpen("file_101",32151679);
-
+	int flag = fileOpen("file_101",32151679);
+	if(flag == 0) return;
+	
 	printf("pcb desc : %s, mode : %d, inode->block : %d \n", pcb->desc->file_name, pcb->desc->mode, pcb->desc->cur_node->blocks[0]);
 	
 	fileRead(1024);
