@@ -80,11 +80,13 @@ int fileOpen(char* filename,unsigned int mode){
 }
 
 
-
+//buf size는 1024 내로랜덤하게 생성해야 할듯?
 void fileRead(unsigned int buf_size){
 	if(pcb->desc->mode == 32151679){
 		unsigned short block = pcb->desc->cur_node->blocks[0];
 		char* buf = (char*) malloc(sizeof(char) * buf_size);
+		
+		
 		buf = strncpy(buf,part->data_blocks[block].d, buf_size);
 		//buf = part->data_blocks[block].d;
 		printf("buf : %s\n",buf);
@@ -107,7 +109,7 @@ int main(){
 	if(flag != 0){
 		printf("pcb desc : %s, mode : %d, inode->block : %d \n", pcb->desc->file_name, pcb->desc->mode, pcb->desc->cur_node->blocks[0]);
 	
-		fileRead(1);
+		fileRead(5);
 		fileClose();
 	}
 	return;
