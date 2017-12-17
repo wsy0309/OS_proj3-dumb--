@@ -33,7 +33,9 @@ void fileMount(){
     }   
     close(fd);
 }
-void fileOpen(char* filename,unsigned int mode){
+
+
+int fileOpen(char* filename,unsigned int mode){
 
 	inode* root = (inode*) malloc(sizeof(inode));
 	root = &part->inode_table[part->s.first_inode];
@@ -45,9 +47,12 @@ void fileOpen(char* filename,unsigned int mode){
 	printf("entry[0] : %s\n",entry);
 
 	printf("dentry length : %d\n",entry->dir_length);
-	
-	while(1){
+	unsigned int dir_size = root->size;
+	printf("dir_size ; %d\n",dir_size);
+	int flag = 0;
+	while(dir_size > 0){
 		if (strcmp(filename, entry->name) == 0){
+			flag = 1;
 			pcb->desc = (Descriptor*) malloc(sizeof(Descriptor));
 			pcb->desc->file_name = filename;
 			pcb->desc->mode = mode;
@@ -57,19 +62,31 @@ void fileOpen(char* filename,unsigned int mode){
 			break;
 		}
 		else{
+			dir_size = dir_size - entry->dir_length;
 			entry = (char*)entry + entry->dir_length;
-			printf("entry : %s\n",entry);
+			//printf("entry : %s\n",entry);
 			printf("entry file name : %s\n",entry->name);
+			printf("dir_size : %d\n",dir_size);
 		}
 
 	}
+	
+	if(flag == 0){
+		printf("No File!!\n");
+		return flag;
+	}
+	printf("file open success!!\n");
+	return flag;
 }
+
+
 
 void fileRead(unsigned int buf_size){
 	if(pcb->desc->mode == 32151679){
 		unsigned short block = pcb->desc->cur_node->blocks[0];
-		char* buf = (char*) malloc(buf_size);
-		buf = part->data_blocks[block].d;
+		char* buf = (char*) malloc(sizeof(char) * buf_size);
+		buf = strncpy(buf,part->data_blocks[block].d, buf_size);
+		//buf = part->data_blocks[block].d;
 		printf("buf : %s\n",buf);
 		printf("buf size : %d\n",sizeof(buf));
 		printf("date : %s\n", part->data_blocks[block].d);
@@ -86,12 +103,13 @@ void fileClose(){
 int main(){
 	pcb = (Pcb*) malloc(sizeof(Pcb));
 	fileMount();
-	fileOpen("file_30",32151679);
-
-	printf("pcb desc : %s, mode : %d, inode->block : %d \n", pcb->desc->file_name, pcb->desc->mode, pcb->desc->cur_node->blocks[0]);
+	int flag = fileOpen("file_3",32151679);
+	if(flag != 0){
+		printf("pcb desc : %s, mode : %d, inode->block : %d \n", pcb->desc->file_name, pcb->desc->mode, pcb->desc->cur_node->blocks[0]);
 	
-	fileRead(4);
-	fileClose();
+		fileRead(1);
+		fileClose();
+	}
 	return;
 }
 
