@@ -15,8 +15,7 @@ typedef struct msgNode{
 //	int io_time;
 //	int cpu_time;
 //	unsigned int vaddr[10];
-	char* buf;
-	char* filename;
+	int filenum;
 	unsigned int mode;
 	unsigned int buf_size;
 }msgNode;
