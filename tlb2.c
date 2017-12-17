@@ -29,6 +29,7 @@ int free_max = 1000000;
 int hit = 0;
 int cold_miss = 0;
 int conflict_miss = 0;
+int mode[2] = {32151569, 32152775};
 
 void PrintQueue(Procq *q);
 void pAlarmHandler(int signo);
@@ -41,13 +42,15 @@ unsigned int checktlb(tlb_t** tlb, L1Page** L1PT, unsigned int VA);
 unsigned int addrTranslator(L1Page** L1PT, unsigned int VA);
 void fileMount();
 int fileOpen(Pcb** pcb, char* filename,unsigned int mode);
-void fileRead(Pcb* pcb, unsigned int buf_size, char* buf);
+void fileRead(Pcb* pcb, unsigned int buf_size);
+void fileWrite(Pcb* pcb, char*filename);
 void fileClose(Pcb* pcb);
 
 key_t msgpid;
 
 int main(){
 	int pid, i;
+	char* file;
 	struct sigaction old_sa, new_sa;
 	struct itimerval new_timer, old_timer;
 	Pcb* next = NULL;
@@ -57,8 +60,8 @@ int main(){
 
 	fileMount();
 
-	//for(i = 0; i<10; i++){
-	for(i = 0; i<1; i++){
+	for(i = 0; i<10; i++){
+	//for(i = 0; i<1; i++){
 		pid = fork();
 		if(pid < 0){
 			printf("fork error\n");
@@ -105,22 +108,21 @@ int main(){
 		//receive msg
 			if((msgrcv(msgpid, &msg, (sizeof(msg) - sizeof(long)), 0, 0)) > 0){
 				if (msg.msgType == 1){
-					//for(i = 0; i<10; i++){
-					for(i = 0; i<1; i++){
+					for(i = 0; i<10; i++){
+					//for(i = 0; i<1; i++){
 						if(pcbs[i]->pid == msg.pid){
-							unsigned int PA;
-
-							int flag = fileOpen(&pcbs[i], msg.filename, msg.mode);
+							sprintf(file,"file_%d",msg.filenum);
+							int flag = fileOpen(&pcbs[i], file, msg.mode);
 							if(flag != 0){
-								//write도 할경우 여기서 타입을 비교!!
-								fileRead(pcbs[i], msg.buf_size, msg.buf);
-								PA = checktlb(&pcbs[i]->tlb, &pcbs[i]->L1PT,&msg.buf);
-								printf("VA : 0x%08x -> PA : 0x%08x\n", &msg.buf, PA);
+								if(msg.mode == 32151569){
+									fileRead(pcbs[i], msg.buf_size);
+								}else if(msg.mode == 32152775){
+									fileWrite(pcbs[i], file);
+								}
 								fileClose(pcbs[i]);
 							}
 							RemoveProcq(runq, pcbs[i]);
 							AddProcq(runq, pcbs[i]);
-							printf("global_tick (%d) proc(%d) sleep (%d) ticks\n", global_tick, pcbs[i]->pid, pcbs[i]->remain_io_time);
 						}
 					}
 					next = runq->head->pcb;
@@ -145,9 +147,9 @@ void pAlarmHandler(int signo){
 	global_tick++;
 
 	present = runq->head->pcb;
-	if(global_tick >= 3){
-		//for(int i = 0; i<10; i++){
-		for(int i = 0; i<1; i++){
+	if(global_tick > 11){
+		for(int i = 0; i<10; i++){
+		//for(int i = 0; i<1; i++){
 			printf("parent killed child)(%d)\n",pcbs[i]->pid);
 			kill(pcbs[i]->pid, SIGKILL);		
 		}
@@ -167,32 +169,30 @@ void pAlarmHandler(int signo){
 *************************************************/
 
 void cAlarmHandler(int signo){
-	int mspid, i;	
-	char* buf;
-	
+	int mspid;	
 	if((mspid = msgget((key_t)QUEUE_KEY, IPC_CREAT|0644)) == -1){
                 printf("msgget error \n");
                 exit(0);
                 }   
 
 	memset(&msg,0,sizeof(msg));
-	//파일이 없는 경우도 포함하기 위해서 크게 잡음
-	//얘 파일 넘버 할껀데..어떻게 해야해...뭐얌...
-	i = (rand() % 110) + 1;
 
-	buf = (char*)malloc(1024 * sizeof(char));
+	srand(time(NULL));	
 	msg.msgType = 1;
 	msg.pid = getpid();
-	msg.filename = "file_3";
-	msg.mode = 32152775;
+	msg.filenum = (rand() % 110) + 1;
+	if((rand()%2) == 0){
+		msg.mode = mode[0];
+	}else{
+		msg.mode = mode[1];
+	}
 //	msg.buf_size = (rand() % 1024) + 1;
 	msg.buf_size = (rand() % 50) + 1;
-	msg.buf = buf;
+	
 	if((msgsnd(mspid, &msg, (sizeof(msg) - sizeof(long)), IPC_NOWAIT)) == -1){
                 printf("msgsnd error \n");
                 exit(0);
         }
-	free(buf);
 	return;
 }
 
@@ -243,7 +243,6 @@ void fileMount(){
 
 
 int fileOpen(Pcb** pcb, char* filename,unsigned int mode){
-
 	inode* root = (inode*) malloc(sizeof(inode));
 	root = &part->inode_table[part->s.first_inode];
 	printf("root Dir inode : %x\n",part->s.first_inode);
@@ -257,6 +256,7 @@ int fileOpen(Pcb** pcb, char* filename,unsigned int mode){
 	unsigned int dir_size = root->size;
 	printf("dir_size ; %d\n",dir_size);
 	int flag = 0;
+
 	while(dir_size > 0){
 		if (strcmp(filename, entry->name) == 0){
 			flag = 1;
@@ -287,30 +287,43 @@ int fileOpen(Pcb** pcb, char* filename,unsigned int mode){
 }
 
 
-//buf size는 1024 내로랜덤하게 생성해야 할듯?
-void fileRead(Pcb* pcb, unsigned int buf_size, char* buf){
-//	if(*pcb->desc->mode == 32151679){
+void fileRead(Pcb* pcb, unsigned int buf_size){
+		unsigned int PA;
+		
 		unsigned short block = (short*)malloc(sizeof(short));
 		block = pcb->desc->cur_node->blocks[0];
-		char* buf2 = (char*) malloc(sizeof(char) * buf_size);
+		char* buf = (char*) malloc(sizeof(char) * buf_size);
 		char* temp = part->data_blocks[block].d;
 
 		for(int i = 0; i < buf_size; i++){
-			buf2[i] = temp[i];
+			buf[i] = temp[i];
 		}
 		
-	//	buf2 = strncpy(buf,part->data_blocks[block].d, buf_size);
-		
-		printf("buf : %s\n",buf2);
-		printf("buf size : %d\n",sizeof(buf2));
+		printf("buf : %s\n",buf);
+		printf("buf size : %d\n",sizeof(buf));
 		printf("date : %s\n", part->data_blocks[block].d);
 		printf("date size : %d\n", sizeof(part->data_blocks[block].d));
-		free(buf2);
-//	}
+
+		PA = checktlb(&pcb->tlb, &pcb->L1PT, buf);
+
+		free(buf);
+}
+
+void fileWrite(Pcb* pcb, char* filename){
+	unsigned short block = pcb->desc->cur_node->blocks[0];
+	printf("datablocks[%d] : %s\n",block,part->data_blocks[block].d);
+	char* buf;
+	sprintf(buf,"Updated %s %d %d %d",filename, (rand()%999999999)+1,(rand()%999999999)+1,(rand()%999999999)+1);
+	for(int i = 0; i<sizeof(buf);i++){
+		part->data_blocks[block].d[i] = buf[i];
+	}
+	printf("buf : %s\n",buf);
+	printf("Write datablocks[%d] : %s\n",block,part->data_blocks[block].d);
+
 }
 
 void fileClose(Pcb* pcb){
-//	memset(pcb->desc,0,sizeof(Descriptor));
+	memset(pcb->desc,0,sizeof(Descriptor));
 	free(pcb->desc);
 	printf("pcd desc : %s, mode: %d\n", pcb->desc->file_name, pcb->desc->mode);
 
