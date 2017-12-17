@@ -108,14 +108,15 @@ int main(){
 					//for(i = 0; i<10; i++){
 					for(i = 0; i<1; i++){
 						if(pcbs[i]->pid == msg.pid){
-							//여기에 이제 파일읽는걸 넣어야 겟지???????????
-							//리드할때 va 매핑 하는것두!!!!!!!!!!!!!!!
+							unsigned int PA;
+
 							int flag = fileOpen(&pcbs[i], msg.filename, msg.mode);
 							if(flag != 0){
 								//write도 할경우 여기서 타입을 비교!!
 								fileRead(pcbs[i], msg.buf_size, msg.buf);
-								//tlb도 넣어야 겟징?
-								//fileClose(pcbs[i]);
+								PA = checktlb(&pcbs[i]->tlb, &pcbs[i]->L1PT,&msg.buf);
+								printf("VA : 0x%08x -> PA : 0x%08x\n", &msg.buf, PA);
+								fileClose(pcbs[i]);
 							}
 							RemoveProcq(runq, pcbs[i]);
 							AddProcq(runq, pcbs[i]);
@@ -145,6 +146,7 @@ void pAlarmHandler(int signo){
 
 	present = runq->head->pcb;
 	if(global_tick >= 3){
+		//for(int i = 0; i<10; i++){
 		for(int i = 0; i<1; i++){
 			printf("parent killed child)(%d)\n",pcbs[i]->pid);
 			kill(pcbs[i]->pid, SIGKILL);		
@@ -183,12 +185,14 @@ void cAlarmHandler(int signo){
 	msg.pid = getpid();
 	msg.filename = "file_3";
 	msg.mode = 32152775;
-	msg.buf_size = (rand() % 1024) + 1;
+//	msg.buf_size = (rand() % 1024) + 1;
+	msg.buf_size = (rand() % 50) + 1;
 	msg.buf = buf;
 	if((msgsnd(mspid, &msg, (sizeof(msg) - sizeof(long)), IPC_NOWAIT)) == -1){
                 printf("msgsnd error \n");
                 exit(0);
         }
+	free(buf);
 	return;
 }
 
@@ -286,22 +290,28 @@ int fileOpen(Pcb** pcb, char* filename,unsigned int mode){
 //buf size는 1024 내로랜덤하게 생성해야 할듯?
 void fileRead(Pcb* pcb, unsigned int buf_size, char* buf){
 //	if(*pcb->desc->mode == 32151679){
-		unsigned short block = pcb->desc->cur_node->blocks[0];
-		//char* buf = (char*) malloc(sizeof(char) * buf_size);
+		unsigned short block = (short*)malloc(sizeof(short));
+		block = pcb->desc->cur_node->blocks[0];
+		char* buf2 = (char*) malloc(sizeof(char) * buf_size);
+		char* temp = part->data_blocks[block].d;
+
+		for(int i = 0; i < buf_size; i++){
+			buf2[i] = temp[i];
+		}
 		
+	//	buf2 = strncpy(buf,part->data_blocks[block].d, buf_size);
 		
-		buf = strncpy(buf,part->data_blocks[block].d, buf_size);
-		//buf = part->data_blocks[block].d;
-		printf("buf : %s\n",buf);
-		printf("buf size : %d\n",sizeof(buf));
+		printf("buf : %s\n",buf2);
+		printf("buf size : %d\n",sizeof(buf2));
 		printf("date : %s\n", part->data_blocks[block].d);
 		printf("date size : %d\n", sizeof(part->data_blocks[block].d));
+		free(buf2);
 //	}
 }
 
 void fileClose(Pcb* pcb){
 //	memset(pcb->desc,0,sizeof(Descriptor));
-	free(&pcb->desc);
+	free(pcb->desc);
 	printf("pcd desc : %s, mode: %d\n", pcb->desc->file_name, pcb->desc->mode);
 
 }
