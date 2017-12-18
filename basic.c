@@ -1,3 +1,7 @@
+/*********************************************
+Single user
+FILE : Open -> Read -> Close
+**********************************************/
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -98,24 +102,16 @@ int main(){
 	printf("msg (key : %d, id : %d) created\n",QUEUE_KEY, msgpid);
 
 	while(1){
-		//메세지 종류에따라 io action 처리를할지
-		//address translation을 할지 
-		//PA = addrTranslater(현재실행 프로세스의 L1PT, 메세지에서 받은 VA)
-		
 		if(msgpid > 0){
 		//receive msg
 			if((msgrcv(msgpid, &msg, (sizeof(msg) - sizeof(long)), 0, 0)) > 0){
 				if (msg.msgType == 1){
-					//for(i = 0; i<10; i++){
 					for(i = 0; i<1; i++){
 						if(pcbs[i]->pid == msg.pid){
 							sprintf(file,"file_%d",msg.filenum);
 							int flag = fileOpen(&pcbs[i], file, msg.mode);
 							if(flag != 0){
-								//write도 할경우 여기서 타입을 비교!!
 								fileRead(pcbs[i], msg.buf_size);
-								//PA = checktlb(&pcbs[i]->tlb, &pcbs[i]->L1PT,&msg.buf);
-								//printf("VA : 0x%08x -> PA : 0x%08x\n", &msg.buf, PA);
 								fileClose(pcbs[i]);
 							}
 							RemoveProcq(runq, pcbs[i]);
@@ -136,7 +132,6 @@ int main(){
 /*********************************************
  pAlarmHandler : parent signal handler
  - 종료: 일정 tick발생 후 child & parent kill
- - update time quantum : 업데이트후 AddProq
  - 자식 프로세서에 signal 보냄
 **********************************************/
 void pAlarmHandler(int signo){
@@ -161,8 +156,7 @@ void pAlarmHandler(int signo){
 }
 /************************************************
  cAlarmHandler : child signal handler
- - update remain_cpu_time
- - io_action : remain_cpu_time == 0 인경우
+  - send file info (msgq)
 *************************************************/
 
 void cAlarmHandler(int signo){
@@ -210,13 +204,13 @@ void fileMount(){
 	
 	int fd = open("disk.img",O_RDONLY);
             
-    printf("superblock\n");
+    printf("------------------------superblock-----------------------\n");
     part = (partition*) malloc(sizeof(partition));;
     read(fd,&part->s,sizeof(super_block));
     printf("%x\n",part->s.first_data_block);      
 
     int i;
-    printf("inode!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    printf("----------------------------inode------------------------\n");
     for(i=0;i<224;i++){
         read(fd,&(part->inode_table[i]),sizeof(inode));
         for(int j = 0;j<6;j++){
@@ -225,14 +219,13 @@ void fileMount(){
 		printf("\n");
     }   
             
-    printf("datablock!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    printf("----------------------------datablock--------------------------------\n");
     for(i=0;i<4088;i++){
             read(fd,&part->data_blocks[i],sizeof(blocks));   
             //printf("%s\n",part->data_blocks[i].d);
     }   
     close(fd);
 }
-
 
 int fileOpen(Pcb** pcb, char* filename,unsigned int mode){
 	inode* root = (inode*) malloc(sizeof(inode));
@@ -242,7 +235,7 @@ int fileOpen(Pcb** pcb, char* filename,unsigned int mode){
 
 	dentry* entry = (dentry*) malloc(sizeof(dentry));
 	entry = &part->data_blocks[root->blocks[0]];
-	printf("entry[0] : %s\n",entry);
+//	printf("entry[0] : %s\n",entry);
 
 	printf("dentry length : %d\n",entry->dir_length);
 	unsigned int dir_size = root->size;
@@ -264,22 +257,24 @@ int fileOpen(Pcb** pcb, char* filename,unsigned int mode){
 			dir_size = dir_size - entry->dir_length;
 			entry = (char*)entry + entry->dir_length;
 			//printf("entry : %s\n",entry);
-			printf("entry file name : %s\n",entry->name);
-			printf("dir_size : %d\n",dir_size);
+			//printf("entry file name : %s\n",entry->name);
+			//printf("dir_size : %d\n",dir_size);
 		}
 
 	}
 	
 	if(flag == 0){
-		printf("No File!!\n");
+		printf("(NO FILE)\n");
+		printf("-----------------------------------------------------------\n");
 		return flag;
 	}
-	printf("file open success!!\n");
+	printf("(FILE OPEN SUCCESS)\n");
 	return flag;
 }
 
 
 void fileRead(Pcb* pcb, unsigned int buf_size){
+		printf("(FILE READ)\n");
 		unsigned int PA;
 		
 		unsigned short block = (short*)malloc(sizeof(short));
@@ -291,10 +286,8 @@ void fileRead(Pcb* pcb, unsigned int buf_size){
 			buf[i] = temp[i];
 		}
 		
-		printf("buf : %s\n",buf);
-		printf("buf size : %d\n",sizeof(buf));
-		printf("date : %s\n", part->data_blocks[block].d);
-		printf("date size : %d\n", sizeof(part->data_blocks[block].d));
+		printf("Read buf : %s\n",buf);
+		printf("datablock[%d] : %s\n",block, part->data_blocks[block].d);
 
 		PA = checktlb(&pcb->tlb, &pcb->L1PT, buf);
 
@@ -304,8 +297,8 @@ void fileRead(Pcb* pcb, unsigned int buf_size){
 void fileClose(Pcb* pcb){
 	memset(pcb->desc,0,sizeof(Descriptor));
 	free(pcb->desc);
-	printf("pcd desc : %s, mode: %d\n", pcb->desc->file_name, pcb->desc->mode);
-
+	printf("(FILE CLOSE)\n");
+	printf("---------------------------------------------------------------------\n");
 }
 
 void PrintQueue(Procq* q){
