@@ -1,3 +1,7 @@
+/**********************************************
+Multiple user + Write
+FILE : Open -> (Read or Write) -> Close
+************************************************/
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -29,6 +33,7 @@ int free_max = 1000000;
 int hit = 0;
 int cold_miss = 0;
 int conflict_miss = 0;
+// read, write
 int mode[2] = {32151569, 32152775};
 
 void PrintQueue(Procq *q);
@@ -45,7 +50,6 @@ int fileOpen(Pcb** pcb, char* filename,unsigned int mode);
 void fileRead(Pcb* pcb, unsigned int buf_size);
 void fileWrite(Pcb* pcb, char* filename);
 void fileClose(Pcb* pcb);
-
 key_t msgpid;
 
 int main(){
@@ -61,7 +65,6 @@ int main(){
 	fileMount();
 
 	for(i = 0; i<10; i++){
-	//for(i = 0; i<1; i++){
 		pid = fork();
 		if(pid < 0){
 			printf("fork error\n");
@@ -100,17 +103,15 @@ int main(){
 	printf("msg (key : %d, id : %d) created\n",QUEUE_KEY, msgpid);
 
 	while(1){
-		//PA = addrTranslater(현재실행 프로세스의 L1PT, 메세지에서 받은 VA)
-		
 		if(msgpid > 0){
 		//receive msg
 			if((msgrcv(msgpid, &msg, (sizeof(msg) - sizeof(long)), 0, 0)) > 0){
 				if (msg.msgType == 1){
 					for(i = 0; i<10; i++){
-					//for(i = 0; i<1; i++){
 						if(pcbs[i]->pid == msg.pid){
 							sprintf(file,"file_%d",msg.filenum);
 							int flag = fileOpen(&pcbs[i], file, msg.mode);
+							//check file exist
 							if(flag != 0){
 								if(msg.mode == mode[0]){
 									fileRead(pcbs[i], msg.buf_size);
@@ -137,7 +138,6 @@ int main(){
 /*********************************************
  pAlarmHandler : parent signal handler
  - 종료: 일정 tick발생 후 child & parent kill
- - update time quantum : 업데이트후 AddProq
  - 자식 프로세서에 signal 보냄
 **********************************************/
 void pAlarmHandler(int signo){
@@ -162,8 +162,7 @@ void pAlarmHandler(int signo){
 }
 /************************************************
  cAlarmHandler : child signal handler
- - update remain_cpu_time
- - io_action : remain_cpu_time == 0 인경우
+  - send file info (msgq)
 *************************************************/
 
 void cAlarmHandler(int signo){
@@ -213,7 +212,9 @@ void child_action(int cpu_time){
 	while(1){
 	}
 }
-
+/*************************************************
+ fileMount : fill super_block, inode, datablock
+*************************************************/
 void fileMount(){
 	
 	int fd = open("disk.img",O_RDONLY);
@@ -240,7 +241,9 @@ void fileMount(){
     }   
     close(fd);
 }
-
+/****************************************************
+ fileOpen : open file and fill descriptor
+*****************************************************/
 
 int fileOpen(Pcb** pcb, char* filename,unsigned int mode){
 	inode* root = (inode*) malloc(sizeof(inode));
@@ -287,8 +290,9 @@ int fileOpen(Pcb** pcb, char* filename,unsigned int mode){
 	printf("(FILE OPEN SUCCESS)\n");
 	return flag;
 }
-
-
+/*****************************************************
+ fileRead : read file and print datablock
+******************************************************/
 void fileRead(Pcb* pcb, unsigned int buf_size){
 		printf("(FILE READ)\n");
 		unsigned int PA;
@@ -311,6 +315,9 @@ void fileRead(Pcb* pcb, unsigned int buf_size){
 
 		free(buf);
 }
+/**************************************************
+ fileWrite : create data and write on datablock
+****************************************************/
 
 void fileWrite(Pcb* pcb, char* filename){
 	printf("(FILE WRITE)\n");
